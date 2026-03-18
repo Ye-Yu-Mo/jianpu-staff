@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Upload, Music, RefreshCw, AlertCircle, ZoomIn, ZoomOut, FileAudio } from 'lucide-react';
+import { Upload, Music, RefreshCw, AlertCircle, ZoomIn, ZoomOut, FileAudio, ArrowRight } from 'lucide-react';
 import { OpenSheetMusicDisplay } from 'opensheetmusicdisplay';
+import { parse } from './lib/jianpu-parser.js';
+import { generate } from './lib/musicxml-generator.js';
 
 // 内置一个简单的 MusicXML 示例 (两只老虎/Frère Jacques 片段)
 const SAMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -55,6 +57,8 @@ export default function App() {
   const [error, setError] = useState('');
   const [zoom, setZoom] = useState(1.0);
   const [fileName, setFileName] = useState('示例曲谱.xml');
+  const [tab, setTab] = useState('upload'); // 'upload' | 'jianpu'
+  const [jianpuText, setJianpuText] = useState('');
 
   // 初始化 OSMD 实例
   useEffect(() => {
@@ -126,6 +130,17 @@ export default function App() {
     loadScore(SAMPLE_XML);
   };
 
+  const handleJianpuConvert = () => {
+    try {
+      const score = parse(jianpuText);
+      const xml = generate(score);
+      setFileName('简谱转换结果');
+      loadScore(xml);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans selection:bg-blue-200">
       <header className="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-10">
@@ -139,50 +154,70 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between transition-all">
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <input
-              type="file"
-              accept=".xml,.musicxml"
-              className="hidden"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-            />
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6 flex flex-col gap-4 transition-all">
+          {/* Tab 切换 */}
+          <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
             <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm w-full sm:w-auto"
-              disabled={isLoading}
+              onClick={() => setTab('upload')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === 'upload' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <Upload className="w-4 h-4" />
-              上传曲谱
+              上传 MusicXML
             </button>
             <button
-              onClick={handleLoadSample}
-              className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors w-full sm:w-auto"
-              disabled={isLoading}
+              onClick={() => setTab('jianpu')}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === 'jianpu' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-              恢复示例
+              输入简谱
             </button>
           </div>
 
-          <div className="flex items-center gap-6 w-full sm:w-auto justify-between sm:justify-end">
-            <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1">
-              <button
-                onClick={() => handleZoom(zoom - 0.2)}
-                className="p-1 hover:bg-white rounded shadow-sm text-slate-600 transition-colors"
-                title="缩小"
-              >
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            {tab === 'upload' ? (
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <input type="file" accept=".xml,.musicxml" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+                  disabled={isLoading}
+                >
+                  <Upload className="w-4 h-4" />
+                  上传曲谱
+                </button>
+                <button
+                  onClick={handleLoadSample}
+                  className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium transition-colors"
+                  disabled={isLoading}
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                  恢复示例
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 w-full sm:w-auto flex-1">
+                <textarea
+                  value={jianpuText}
+                  onChange={(e) => setJianpuText(e.target.value)}
+                  placeholder="输入简谱，例如：[4/4] [1=C] 1 2 3 4 | 5 6 7 1' |"
+                  className="w-full h-24 px-3 py-2 text-sm border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300 font-mono"
+                />
+                <button
+                  onClick={handleJianpuConvert}
+                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm w-fit"
+                  disabled={isLoading || !jianpuText.trim()}
+                >
+                  <ArrowRight className="w-4 h-4" />
+                  转换为五线谱
+                </button>
+              </div>
+            )}
+
+            {/* 缩放控制 */}
+            <div className="flex items-center gap-2 bg-slate-100 rounded-lg p-1 shrink-0">
+              <button onClick={() => handleZoom(zoom - 0.2)} className="p-1 hover:bg-white rounded shadow-sm text-slate-600 transition-colors" title="缩小">
                 <ZoomOut className="w-4 h-4" />
               </button>
-              <span className="text-sm font-medium w-12 text-center text-slate-700">
-                {Math.round(zoom * 100)}%
-              </span>
-              <button
-                onClick={() => handleZoom(zoom + 0.2)}
-                className="p-1 hover:bg-white rounded shadow-sm text-slate-600 transition-colors"
-                title="放大"
-              >
+              <span className="text-sm font-medium w-12 text-center text-slate-700">{Math.round(zoom * 100)}%</span>
+              <button onClick={() => handleZoom(zoom + 0.2)} className="p-1 hover:bg-white rounded shadow-sm text-slate-600 transition-colors" title="放大">
                 <ZoomIn className="w-4 h-4" />
               </button>
             </div>
